@@ -8,7 +8,10 @@ import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.Scanner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.crypto.BadPaddingException;
@@ -22,34 +25,67 @@ import javax.crypto.SecretKey;
 public class Encriptacion {
 
     public static void main(String[] args) {
-        String usuario;
-        String pass;
-        String mensaje = "Bienvenido";
-        
-        Scanner sc = new Scanner(System.in);
-        
-        String regexUsuario = "^[a-z]{8}$";
-        String regexPass = "^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9]).{8,16}$";
-        
-        do {
-            System.out.println("Introduca el nombre: "); 
-            usuario = sc.nextLine();  
+        try {
+            String usuario;
+            String pass;
+            String mensaje;  
             
-            if(!validar(usuario, regexUsuario))
-                System.out.println("El usuario debe tener una longitud de 8 caracteres en minúscula.");
-                     
-        } while(!validar(usuario, regexUsuario));
-        
-        do {
-            System.out.println("Introduca la contraseña: "); 
-            pass = sc.nextLine();
+            Scanner sc = new Scanner(System.in);
             
-            if(!validar(pass, regexPass))
-                System.out.println("La contraseña debe tener una longitud de entre 8-16 caracteres, una mayúscula, una minúscula y un número");
+            String regexUsuario = "^[a-z]{8}$";
+            String regexPass = "^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9]).{8,16}$";
             
-        } while(!validar(pass, regexPass));
-       
-        escribirFichero(usuario, pass, mensaje);
+            do {
+                System.out.println("Introduca el nombre: ");
+                usuario = sc.nextLine();
+                
+                if(!validar(usuario, regexUsuario))
+                    System.out.println("El usuario debe tener una longitud de 8 caracteres en minúscula.");
+                
+            } while(!validar(usuario, regexUsuario));
+            
+            do {
+                System.out.println("Introduca la contraseña: ");
+                pass = sc.nextLine();
+                
+                if(!validar(pass, regexPass))
+                    System.out.println("La contraseña debe tener una longitud de entre 8-16 caracteres, una mayúscula, una minúscula y un número");
+                
+            } while(!validar(pass, regexPass));
+            
+            mensaje = "Bienvenido " + usuario;
+            
+            byte[] usuarioEncriptado = encriptar(usuario);
+            byte[] passEncriptado = encriptar(pass);
+            byte[] mensajeEncriptado = encriptar(mensaje);
+            escribirFichero(usuarioEncriptado, passEncriptado, mensajeEncriptado);
+            
+            String registro = leerFichero(usuarioEncriptado);
+            
+             String parts[] = registro.split(":");
+             String usuarioReg = parts[0];
+             String passReg = parts[1];
+             String mensajeReg = parts[2];
+             System.out.println(usuarioReg);
+             System.out.println(passReg);
+             System.out.println(mensajeReg);
+             
+            
+            
+            
+            
+            
+        } catch (NoSuchAlgorithmException ex) {
+            Logger.getLogger(Encriptacion.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (NoSuchPaddingException ex) {
+            Logger.getLogger(Encriptacion.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (BadPaddingException ex) {
+            Logger.getLogger(Encriptacion.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InvalidKeyException ex) {
+            Logger.getLogger(Encriptacion.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IllegalBlockSizeException ex) {
+            Logger.getLogger(Encriptacion.class.getName()).log(Level.SEVERE, null, ex);
+        }
         
         
         
@@ -65,19 +101,47 @@ public class Encriptacion {
         return false;
     }
     
-    private static void encriptar() throws NoSuchAlgorithmException, NoSuchPaddingException,
+    private static byte[] encriptar(String texto) throws NoSuchAlgorithmException, NoSuchPaddingException,
         BadPaddingException, InvalidKeyException, IllegalBlockSizeException {
-        String plainText = "This is just an example";
-        String algorithm = "Rijndael/ECB/PKCS5Padding";
-        Cipher cipher = Cipher.getInstance(algorithm);
-        KeyGenerator keyGenerator = KeyGenerator.getInstance(algorithm);
-        keyGenerator.init(128);
-        SecretKey secretKey = keyGenerator.generateKey();
+        
+        String algorithm = "Rijndael";
+        String transf = "Rijndael/ECB/PKCS5Padding";
+        
+        KeyGenerator keyGen = KeyGenerator.getInstance(algorithm);
+        SecureRandom sr = new SecureRandom();
+        String seed = "QuePenaQueSeAcabaronLasVacaciones";
+        sr.setSeed(seed.getBytes());
+        keyGen.init(128, sr);
+        SecretKey secretKey = keyGen.generateKey();
+        Cipher cipher = Cipher.getInstance(transf);
         cipher.init(Cipher.ENCRYPT_MODE, secretKey);
-        byte[] encrypText = cipher.doFinal(plainText.getBytes());
+        
+        byte[] encrypText = cipher.doFinal(texto.getBytes());
+        
+        return encrypText;
     }
     
-    private static void leerFichero() {
+    private static String desencriptar(String texto) throws NoSuchAlgorithmException, NoSuchPaddingException,
+        BadPaddingException, InvalidKeyException, IllegalBlockSizeException {
+        
+        String algorithm = "Rijndael";
+        String transf = "Rijndael/ECB/PKCS5Padding";
+        
+        KeyGenerator keyGen = KeyGenerator.getInstance(algorithm);
+        SecureRandom sr = new SecureRandom();
+        String seed = "QuePenaQueSeAcabaronLasVacaciones";
+        sr.setSeed(seed.getBytes());
+        keyGen.init(128, sr);
+        SecretKey secretKey = keyGen.generateKey();
+        Cipher cipher = Cipher.getInstance(transf);
+        cipher.init(Cipher.DECRYPT_MODE, secretKey);
+        
+        byte[] encrypText = cipher.doFinal(texto.getBytes());
+        
+        return new String(encrypText);
+    }
+    
+    private static String leerFichero(byte[] usuarioEncriptado) {
       File archivo = null;
       FileReader fr = null;
       BufferedReader br = null;
@@ -91,8 +155,17 @@ public class Encriptacion {
 
          // Lectura del fichero
          String linea;
-         while((linea=br.readLine())!=null)
-            System.out.println(linea);
+         
+         
+         
+         while((linea=br.readLine())!=null) {
+
+               String parts[] = linea.split(":");
+               String usuario = parts[0];
+             if(usuarioEncriptado.toString().equals(usuario))
+                 return linea;
+         }
+            
       }
       catch(Exception e){
          e.printStackTrace();
@@ -108,14 +181,15 @@ public class Encriptacion {
             e2.printStackTrace();
          }
       }
+      return null;
    }
     
-    private static void escribirFichero(String usuario, String pass, String mensaje) {
+    private static void escribirFichero(byte[] usuario, byte[] pass, byte[] mensaje) {
         FileWriter fichero = null;
         PrintWriter pw = null;
         try
         {
-            fichero = new FileWriter("info.txt");
+            fichero = new FileWriter("info.txt", true);
             pw = new PrintWriter(fichero);
             
             pw.println(usuario + ":" + pass + ":" + mensaje);
